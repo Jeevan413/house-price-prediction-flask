@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>House Price Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      :root {
+        --bg-main: #020617;
+        --bg-card: rgba(15, 23, 42, 0.98);
+        --border-soft: rgba(148, 163, 184, 0.22);
+        --accent: #38bdf8;
+        --accent-soft: #1d4ed8;
+        --text-main: #e5e7eb;
+        --text-muted: #9ca3af;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top, #1d4ed8 0, #020617 45%, #020617 100%),
+          radial-gradient(circle at bottom, #0f172a 0, #020617 55%);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        color: var(--text-main);
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      .wrap {
+        max-width: 1150px;
+        margin: 0 auto;
+      }
+      .top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+      .top-bar h1 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0.03em;
+      }
+      .top-bar a {
+        text-decoration: none;
+        font-size: 13px;
+        color: #93c5fd;
+      }
+      .kpi-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+      @media (max-width: 900px) {
+        .kpi-row {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .kpi-card {
+        background: linear-gradient(
+          145deg,
+          rgba(15, 23, 42, 0.98),
+          rgba(15, 23, 42, 0.7)
+        );
+        border-radius: 16px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-soft);
+        box-shadow: 0 14px 38px rgba(0, 0, 0, 0.7);
+      }
+      .kpi-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+      .kpi-value {
+        font-size: 18px;
+        font-weight: 600;
+      }
+      .kpi-sub {
+        font-size: 11px;
+        color: #6ee7b7;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+        gap: 18px;
+      }
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .card {
+        position: relative;
+        background: var(--bg-card);
+        border-radius: 18px;
+        padding: 16px 18px 12px;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.65),
+          0 0 0 1px var(--border-soft);
+        overflow: hidden;
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: -40%;
+        background: radial-gradient(
+          circle at top right,
+          rgba(56, 189, 248, 0.2),
+          transparent 55%
+        );
+        opacity: 0.6;
+        pointer-events: none;
+      }
+      .card-inner {
+        position: relative;
+        z-index: 1;
+      }
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.5);
+        color: var(--text-muted);
+        background: rgba(15, 23, 42, 0.9);
+      }
+      .pill {
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(56, 189, 248, 0.08);
+        color: #7dd3fc;
+        border: 1px solid rgba(56, 189, 248, 0.35);
+      }
+      .card h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .card p {
+        margin: 0 0 10px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .chart-wrapper {
+        position: relative;
+        height: 260px;
+      }
+      @media (max-width: 600px) {
+        .chart-wrapper {
+          height: 220px;
+        }
+      }
+      canvas {
+        max-width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="top-bar">
+        <h1>House Price Analytics</h1>
+        <a href="/">← Back to Predictor</a>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">Median Price</div>
+          <div class="kpi-value" id="kpi-median">₹–</div>
+          <div class="kpi-sub">Across all listings</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Average Price / sq ft</div>
+          <div class="kpi-value" id="kpi-ppsf">₹–</div>
+          <div class="kpi-sub">Indicative affordability</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Most Common Bedroom Count</div>
+          <div class="kpi-value" id="kpi-mode-bed">– BHK</div>
+          <div class="kpi-sub">Dominant configuration</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Max Price</div>
+          <div class="kpi-value" id="kpi-max">₹–</div>
+          <div class="kpi-sub">Top of the market</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <!-- Chart 1 -->
+        <div class="card">
+          <div class="card-inner">
+            <div class="card-header">
+              <span class="badge">Chart · 01 · Line</span>
+              <span class="pill">Interactive · Gradient</span>
+            </div>
+            <h2>Size vs Price</h2>
+            <p>
+              Explore how house prices scale with built‑up area, including
+              hover details and smoothed trends.
+            </p>
+            <div class="chart-wrapper">
+              <canvas id="sizePriceChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart 2 -->
+        <div class="card">
+          <div class="card-inner">
+            <div class="card-header">
+              <span class="badge">Chart · 02 · Bar</span>
+              <span class="pill">Grouped · Comparable</span>
+            </div>
+            <h2>Average Price per Bedroom</h2>
+            <p>
+              Average listing price by bedroom count to spot which configurations
+              are relatively expensive.
+            </p>
+            <div class="chart-wrapper">
+              <canvas id="bedroomChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Single script block, no redeclarations! -->
+    <script>
+      // Assign variables from server/Jinja only once
+      const sizes = {{ sizes|tojson }};
+      const prices = {{ prices|tojson }};
+      const bedrooms = {{ bedrooms|tojson }};
+      const avgPrices = {{ avg_prices|tojson }};
+
+      // ---------- KPI Cards ----------
+      function formatINR(x) {
+        if (x === null || x === undefined || isNaN(x)) return "–";
+        return x.toLocaleString("en-IN", {
+          style: "currency",
+          currency: "INR",
+          maximumFractionDigits: 0
+        });
+      }
+      function median(values) {
+        if (!values.length) return null;
+        const arr = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(arr.length / 2);
+        return arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+      }
+      function mode(arr) {
+        if (!arr.length) return null;
+        const counts = {};
+        let best = arr[0];
+        let bestCount = 0;
+        arr.forEach((v) => {
+          counts[v] = (counts[v] || 0) + 1;
+          if (counts[v] > bestCount) {
+            bestCount = counts[v];
+            best = v;
+          }
+        });
+        return best;
+      }
+      function computeKPIs() {
+        const totalPrice = prices.reduce((s, v) => s + v, 0);
+        const totalSize = sizes.reduce((s, v) => s + v, 0);
+        const medianPrice = median(prices);
+        const avgPPSF = totalSize ? totalPrice / totalSize : null;
+        const maxPrice = prices.length ? Math.max(...prices) : null;
+        const modeBedroom = mode(bedrooms);
+        document.getElementById("kpi-median").textContent =
+          medianPrice !== null ? formatINR(medianPrice) : "–";
+        document.getElementById("kpi-ppsf").textContent =
+          avgPPSF !== null ? formatINR(avgPPSF) : "–";
+        document.getElementById("kpi-max").textContent =
+          maxPrice !== null ? formatINR(maxPrice) : "–";
+        document.getElementById("kpi-mode-bed").textContent =
+          modeBedroom !== null ? modeBedroom + " BHK" : "–";
+      }
+      computeKPIs();
+
+      // ---------- Chart 1: Size vs Price ----------
+      const ctx1 = document.getElementById("sizePriceChart").getContext("2d");
+      let gradientFill;
+      function getGradient(ctx, chartArea) {
+        if (!chartArea) return "rgba(56, 189, 248, 0.15)";
+        const { top, bottom } = chartArea;
+        gradientFill = ctx.createLinearGradient(0, bottom, 0, top);
+        gradientFill.addColorStop(0, "rgba(59, 130, 246, 0.0)");
+        gradientFill.addColorStop(0.4, "rgba(59, 130, 246, 0.25)");
+        gradientFill.addColorStop(1, "rgba(59, 130, 246, 0.5)");
+        return gradientFill;
+      }
+      const sizePriceChart = new Chart(ctx1, {
+        type: "line",
+        data: {
+          labels: sizes,
+          datasets: [{
+            label: "Price (₹)",
+            data: prices,
+            borderWidth: 2,
+            borderColor: "#38bdf8",
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            pointBackgroundColor: "#38bdf8",
+            pointBorderColor: "#020617",
+            tension: 0.25,
+            fill: true,
+            backgroundColor(context) {
+              const chart = context.chart;
+              const { ctx, chartArea } = chart;
+              if (!chartArea) return null;
+              return getGradient(ctx, chartArea);
+            },
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: {
+              display: true,
+              labels: { color: "#e5e7eb", font: { size: 11 } }
+            },
+            tooltip: {
+              backgroundColor: "rgba(15,23,42,0.96)",
+              borderColor: "rgba(148,163,184,0.5)",
+              borderWidth: 1,
+              titleFont: { size: 12, weight: "600" },
+              bodyFont: { size: 11 },
+              padding: 10,
+              callbacks: {
+                title(tooltipItems) {
+                  const i = tooltipItems[0].dataIndex;
+                  return `Size: ${sizes[i]} sq ft`;
+                },
+                label(context) {
+                  return "Price: " + formatINR(context.parsed.y);
+                },
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: "Size (sq ft)", color: "#9ca3af", font: { size: 11 } },
+              ticks: { color: "#9ca3af", maxRotation: 0 },
+              grid: { color: "rgba(31,41,55,0.75)" },
+            },
+            y: {
+              title: { display: true, text: "Price (₹)", color: "#9ca3af", font: { size: 11 } },
+              ticks: { color: "#9ca3af" },
+              grid: { color: "rgba(31,41,55,0.75)" },
+            }
+          }
+        }
+      });
+
+      // ---------- Chart 2: Avg Price per Bedroom ----------
+      const ctx2 = document.getElementById("bedroomChart").getContext("2d");
+      const bedroomChart = new Chart(ctx2, {
+        type: "bar",
+        data: {
+          labels: bedrooms,
+          datasets: [{
+            label: "Avg Price (₹)",
+            data: avgPrices,
+            borderWidth: 1,
+            borderRadius: 6,
+            backgroundColor: function (context) {
+              const index = context.dataIndex;
+              const base = "rgba(129, 140, 248, ";
+              const alpha = 0.35 + (index % 3) * 0.15;
+              return base + alpha + ")";
+            },
+            borderColor: "rgba(129, 140, 248, 0.9)",
+            hoverBackgroundColor: "rgba(129, 140, 248, 0.9)",
+            hoverBorderColor: "#a5b4fc",
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              labels: { color: "#e5e7eb", font: { size: 11 } }
+            },
+            tooltip: {
+              backgroundColor: "rgba(15,23,42,0.96)",
+              borderColor: "rgba(148,163,184,0.5)",
+              borderWidth: 1,
+              titleFont: { size: 12, weight: "600" },
+              bodyFont: { size: 11 },
+              padding: 10,
+              callbacks: {
+                title(items) {
+                  const i = items[0].dataIndex;
+                  return `${bedrooms[i]} BHK`;
+                },
+                label(context) {
+                  return "Avg Price: " + formatINR(context.parsed.y);
+                },
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: "Bedrooms", color: "#9ca3af", font: { size: 11 } },
+              ticks: { color: "#9ca3af" },
+              grid: { display: false },
+            },
+            y: {
+              title: { display: true, text: "Avg Price (₹)", color: "#9ca3af", font: { size: 11 } },
+              ticks: { color: "#9ca3af" },
+              grid: { color: "rgba(31,41,55,0.75)" },
+            }
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
